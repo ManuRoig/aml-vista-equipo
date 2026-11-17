@@ -127,6 +127,8 @@
       const d = new DOMParser().parseFromString(await r.text(), 'text/html');
       const formOrig = d.querySelector('form[action$="/tasks/results"]');
       const frameOrig = d.querySelector('turbo-frame#all_assignments_results');
+      // contenedor nativo: lleva los controladores de «Filter…» (quick-find) y de «Show subtasks» (toggle-class)
+      const reportOrig = d.querySelector('div.report.all-tasks');
       if (!formOrig || !frameOrig) { console.info('[AML Vista de equipo] Basecamp ha cambiado la vista All tasks'); return; }
       if (location.pathname !== pag.ruta || document.getElementById(ID)) return;   // se navegó mientras tanto
 
@@ -173,6 +175,12 @@
       frame.removeAttribute('src'); frame.innerHTML = '';     // se carga al aplicar la selección
       seccion.querySelector('.aml-ve__cuerpo').prepend(form);
       seccion.querySelector('.aml-ve__resultados').append(frame);
+      if (reportOrig) {
+        const cuerpo = seccion.querySelector('.aml-ve__cuerpo');
+        const envoltorio = document.importNode(reportOrig, false);   // solo el contenedor, con sus atributos
+        envoltorio.append(...cuerpo.childNodes);
+        cuerpo.append(envoltorio);
+      }
       const aviso = seccion.querySelector('.aml-ve__aviso');
       if (noReconocidos.size) aviso.textContent = 'No reconozco en Basecamp: ' + [...noReconocidos].join(', ') + '. Revisa el documento «Grupos de departamento».';
 

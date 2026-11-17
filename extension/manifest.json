@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AML Vista de equipo",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "En los To-dos de cada proyecto de departamento muestra las tareas de toda la gente del departamento, de todos los proyectos (vista nativa de Basecamp).",
   "permissions": ["storage", "alarms", "scripting"],
   "host_permissions": ["https://app.basecamp.com/*"],

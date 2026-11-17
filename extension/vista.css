@@ -1,0 +1,13 @@
+/* AML Vista de equipo: lo mínimo; el resto son clases nativas de Basecamp */
+#aml-vista-equipo { margin: 0 0 24px; }
+#aml-vista-equipo .aml-ve__modo { display: flex; justify-content: center; margin: 4px 0 20px; }
+#aml-vista-equipo .aml-ve__aviso { margin: 8px 0 0; font-size: 0.875em; color: var(--color-ink-medium, #6b6b6b); }
+#aml-vista-equipo .aml-ve__aviso:empty { display: none; }
+#aml-vista-equipo .aml-ve__resultados { margin-top: 16px; }
+#aml-vista-equipo .aml-ve__grupos { position: relative; }
+#aml-vista-equipo .aml-ve__grupos dialog[open] { display: flex; position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; margin: 0; }
+#aml-vista-equipo .aml-ve__grupos .popup__btn .icon--check { visibility: hidden; }
+#aml-vista-equipo .aml-ve__grupos .popup__btn input:checked ~ .icon--check { visibility: visible; }
+#aml-vista-equipo .aml-ve__volver { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--color-border, rgba(128,128,128,.25)); }
+#aml-vista-equipo .aml-ve__volver .popup__btn { width: 100%; text-align: start; }
+.aml-ve-oculto { display: none !important; }

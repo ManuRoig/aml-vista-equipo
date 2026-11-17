@@ -1,0 +1,9 @@
+# Nunca al repositorio publico
+keys/
+dist/
+respaldos/
+*.pem
+*.crx
+# herramientas antiguas (empaquetado .crx y directiva local), solo en el PC de Manu
+build.ps1
+instalar-politica.ps1

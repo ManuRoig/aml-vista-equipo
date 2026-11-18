@@ -147,18 +147,17 @@
       };
       const miembros = new Map(grupos.map(g => [g.nombre, idsDeGrupo(g)]));
 
-      // vista por defecto del documento: lo que es un grupo cuenta como grupo, el resto como persona suelta
-      const porDefecto = () => {
-        const p = { grupos: [], extra: [], excluidos: [], modo: 'equipo' };
-        vistaDoc.elementos.forEach(el => {
-          const g = grupos.find(x => norm(x.nombre) === norm(el));
-          if (g) { if (!p.grupos.includes(g.nombre)) p.grupos.push(g.nombre); return; }
-          const id = personas.get(norm(el));
-          if (id) { if (!p.extra.includes(id)) p.extra.push(id); } else noReconocidos.add(`${el} (VISTA ${vistaDoc.proyecto})`);
-        });
-        return p;
-      };
-      const defecto = porDefecto();
+      // Modelo: lo que manda es el CONJUNTO DE PERSONAS marcadas. Un grupo es un atajo:
+      // marcarlo añade a todas sus personas, quitarlo las quita todas, y aparece marcado
+      // solo si están todas (si se desmarca a una, el grupo deja de estar completo).
+      // Vista por defecto del documento: grupos (todas sus personas) + personas sueltas.
+      const defecto = new Set();
+      vistaDoc.elementos.forEach(el => {
+        const g = grupos.find(x => norm(x.nombre) === norm(el));
+        if (g) { miembros.get(g.nombre).forEach(id => defecto.add(id)); return; }
+        const id = personas.get(norm(el));
+        if (id) defecto.add(id); else noReconocidos.add(`${el} (VISTA ${vistaDoc.proyecto})`);
+      });
 
       // estructura
       const seccion = document.createElement('section');
@@ -216,38 +215,53 @@
       // ---------- estado ----------
       // sin personalizar => la vista del documento (y sigue al documento si este cambia)
       // (la pestaña elegida se recuerda aparte; grupos y personas solo si el usuario los ha tocado)
+      const existentes = new Set([...personas.values()]);
       const guardada = await leerPref(pag.bucket);
-      const pref = structuredClone(defecto);
+      const pref = { modo: 'equipo', personalizada: false };
+      let sel = new Set(defecto);                               // personas marcadas
       if (guardada) {
         pref.modo = guardada.modo === 'proyecto' ? 'proyecto' : 'equipo';
-        if (guardada.personalizada) Object.assign(pref, {
-          personalizada: true, grupos: guardada.grupos || [], extra: guardada.extra || [], excluidos: guardada.excluidos || [],
-        });
+        if (guardada.personalizada) {
+          pref.personalizada = true;
+          if (Array.isArray(guardada.personas)) sel = new Set(guardada.personas);
+          else {                                                // formato 1.1–1.3.6: grupos + extra − excluidos
+            sel = new Set();
+            (guardada.grupos || []).forEach(n => miembros.get(n)?.forEach(id => sel.add(id)));
+            (guardada.excluidos || []).forEach(id => sel.delete(id));
+            (guardada.extra || []).forEach(id => sel.add(id));
+          }
+        }
       }
-      pref.grupos = pref.grupos.filter(n => miembros.has(n));
+      sel = new Set([...sel].filter(id => existentes.has(id)));
       let aplicando = false;
 
-      const idsGrupos = () => { const s = new Set(); pref.grupos.forEach(n => miembros.get(n)?.forEach(id => s.add(id))); return s; };
-      const seleccion = () => {
-        const s = idsGrupos();
-        pref.excluidos.forEach(id => s.delete(id));
-        pref.extra.forEach(id => s.add(id));
-        return s;
-      };
+      const completo = n => { const m = miembros.get(n); return m.size > 0 && [...m].every(id => sel.has(id)); };
       const pintarGrupos = () => {
-        lista.querySelectorAll('input').forEach(i => { i.checked = pref.grupos.includes(i.value); i.closest('li').setAttribute('aria-selected', String(i.checked)); });
-        const n = pref.grupos.length;
-        caja.querySelector('.aml-ve__etiqueta').textContent = n === 0 ? 'Sin grupo' : n === 1 ? pref.grupos[0] : `${pref.grupos[0]} +${n - 1}`;
+        const completos = [];
+        lista.querySelectorAll('input').forEach(i => {
+          const m = miembros.get(i.value), dentro = [...m].filter(id => sel.has(id)).length;
+          i.checked = completo(i.value);
+          if (i.checked) completos.push(i.value);
+          i.closest('li').setAttribute('aria-selected', String(i.checked));
+          // «2/6»: cuántas personas del grupo están marcadas; completo (6/6) => marcado y en negrita
+          const span = i.closest('label').querySelector('span.truncate');
+          span.textContent = `${i.value} (${dentro}/${m.size})`;
+          span.classList.toggle('aml-ve__completo', i.checked);
+        });
+        // primero los grupos en el orden de la línea VISTA del documento (el del departamento delante)
+        const orden = g => { const k = vistaDoc.elementos.findIndex(el => norm(el) === norm(g)); return k < 0 ? 999 : k; };
+        completos.sort((a, b) => orden(a) - orden(b));
+        const n = completos.length;
+        caja.querySelector('.aml-ve__etiqueta').textContent = n === 0 ? 'Sin grupo' : n === 1 ? completos[0] : `${completos[0]} +${n - 1}`;
       };
       const pintarModo = () => {
         seccion.querySelectorAll('[data-modo]').forEach(b => b.classList.toggle('active', b.dataset.modo === pref.modo));
         seccion.querySelector('.aml-ve__cuerpo').classList.toggle('aml-ve-oculto', pref.modo !== 'equipo');
         ocultables.forEach(c => c.classList.toggle('aml-ve-oculto', pref.modo === 'equipo'));
       };
-      const guardar = () => guardarPref(pag.bucket, pref);
+      const guardar = () => guardarPref(pag.bucket, { modo: pref.modo, personalizada: pref.personalizada, personas: pref.personalizada ? [...sel] : [] });
 
       function aplicar() {
-        const sel = seleccion();
         const inputs = [...form.querySelectorAll('input[name="assignee_ids[]"]')];
         let ultimo = null;
         inputs.forEach(i => {
@@ -267,18 +281,21 @@
       // cambios de personas hechos a mano en el desplegable nativo: se recuerdan
       form.addEventListener('change', e => {
         const i = e.target;
-        if (aplicando || !(i instanceof HTMLInputElement) || i.name !== 'assignee_ids[]') return;
-        const marcados = new Set([...form.querySelectorAll('input[name="assignee_ids[]"]:checked')].map(x => x.value));
-        const deGrupo = idsGrupos();
-        pref.extra = [...marcados].filter(id => !deGrupo.has(id));
-        pref.excluidos = [...deGrupo].filter(id => !marcados.has(id));
-        pref.personalizada = true; guardar();
+        if (!(i instanceof HTMLInputElement) || i.name !== 'assignee_ids[]') return;
+        i.closest('li')?.setAttribute('aria-selected', String(i.checked));   // la marca ✓ sigue a la casilla
+        if (aplicando) return;
+        if (i.checked) sel.add(i.value); else sel.delete(i.value);   // solo esta persona
+        pref.personalizada = true; guardar(); pintarGrupos();         // el grupo se marca/desmarca solo
       }, true);
-      // "Anyone" (quitar filtro de personas) => sin grupos ni extras
+      // "Anyone" (quitar filtro de personas) => nadie marcado
       form.addEventListener('click', e => {
         const b = e.target.closest('[data-action*="activity-filter#resetFilter"]');
         if (b && b.dataset.activityFilterNameParam === 'assignee_ids[]') {
-          pref.grupos = []; pref.extra = []; pref.excluidos = []; pref.personalizada = true; guardar(); setTimeout(pintarGrupos, 0);
+          sel = new Set(); pref.personalizada = true; guardar();
+          setTimeout(() => {
+            pintarGrupos();
+            form.querySelectorAll('input[name="assignee_ids[]"]').forEach(x => x.closest('li')?.setAttribute('aria-selected', String(x.checked)));
+          }, 0);
         }
       }, true);
 
@@ -293,16 +310,13 @@
       dialogo.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
       lista.addEventListener('change', e => {
         const i = e.target;
-        pref.grupos = i.checked ? [...new Set([...pref.grupos, i.value])] : pref.grupos.filter(n => n !== i.value);
-        // al cambiar de grupos, las excepciones manuales de quien ya no está se limpian
-        const deGrupo = idsGrupos();
-        pref.excluidos = pref.excluidos.filter(id => deGrupo.has(id));
-        pref.extra = pref.extra.filter(id => !deGrupo.has(id));
+        // marcar el grupo = marcar a todas sus personas; quitarlo = desmarcarlas todas
+        miembros.get(i.value).forEach(id => { if (i.checked) sel.add(id); else sel.delete(id); });
         pref.personalizada = true; guardar(); pintarGrupos(); aplicar();
       });
 
       caja.querySelector('.aml-ve__volver button').addEventListener('click', () => {
-        Object.assign(pref, structuredClone(defecto), { modo: pref.modo, personalizada: false });
+        sel = new Set(defecto); pref.personalizada = false;
         guardar(); cerrar(); pintarGrupos(); aplicar();
       });
 
@@ -310,6 +324,11 @@
       seccion.querySelectorAll('[data-modo]').forEach(b => b.addEventListener('click', () => {
         pref.modo = b.dataset.modo; guardar(); pintarModo();
       }));
+
+      // tareas de la primera página de cada carga del filtro (al bajar, Basecamp añade más sin recargar el frame)
+      const ITEM = '[data-quick-find-target="searchable"]';
+      let itemsPrimeraCarga = null;
+      frame.addEventListener('turbo:frame-load', () => { itemsPrimeraCarga = frame.querySelectorAll(ITEM).length; });
 
       pintarGrupos(); pintarModo(); aplicar();
 
@@ -322,7 +341,9 @@
         if (document.querySelector('dialog[open]')) return;
         const act = document.activeElement;
         if (act && act !== document.body && seccion.contains(act) && /INPUT|TEXTAREA|SELECT/.test(act.tagName)) return;
-        if (frame.querySelectorAll('[id^="all_assignments-pagination-contents-"]').length > 1) return;
+        // no refrescar si se han cargado más páginas al bajar (volvería a la primera) ni con texto en «Filter…»
+        if (itemsPrimeraCarga !== null && frame.querySelectorAll(ITEM).length > itemsPrimeraCarga) return;
+        if (seccion.querySelector('input[data-quick-find-target="query"]')?.value.trim()) return;
         form.requestSubmit(); ultimoRefresco = Date.now();
       }, 10 * 1000);
     } catch (e) {

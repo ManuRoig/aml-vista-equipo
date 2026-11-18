@@ -18,6 +18,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubus
 
 Después, en Chrome: `chrome://extensions` → «Modo de desarrollador» → «Cargar descomprimida» → la carpeta que indica el instalador (queda copiada en el portapapeles).
 
+**Importante:** la extensión solo funciona entrando por **https://app.basecamp.com** (Basecamp 5). Si se entra por la dirección antigua `3.basecamp.com`, por ejemplo desde un marcador viejo, no aparece nada.
+
 ## Actualizaciones
 
 Automáticas. Cada 15 minutos y al iniciar sesión, el equipo comprueba la versión de `extension/manifest.json` en este repositorio. Si hay una más nueva, la descarga, y la extensión se recarga sola en Chrome en menos de un minuto.

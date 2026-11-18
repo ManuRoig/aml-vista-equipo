@@ -105,31 +105,45 @@
     return gruposCache;
   }
 
+  // ---------- aviso visible cuando algo falla (para no fallar en silencio) ----------
+  const ID_AVISO = ID + '-aviso';
+  function avisar(motivo) {
+    document.getElementById(ID_AVISO)?.remove();
+    let v = '?'; try { v = chrome.runtime.getManifest().version; } catch { /* huérfano */ }
+    const p = document.createElement('p');
+    p.id = ID_AVISO; p.className = 'aml-ve__fallo';
+    p.textContent = `AML Vista de equipo ${v}: ${motivo}`;
+    const cab = document.querySelector('article.recordable--todoset > header.perma-header');
+    if (cab) cab.after(p); else document.querySelector('#main-content, main')?.prepend(p);
+    console.warn('[AML Vista de equipo]', motivo);
+  }
+
   // ---------- montaje ----------
   async function montar() {
     if (!vivo()) { parar(); return; }
     const pag = paginaTodoset();
     if (!pag || montando || document.getElementById(ID)) return;
     const cabecera = document.querySelector('article.recordable--todoset > header.perma-header');
-    if (!cabecera) return;
+    if (!cabecera) { avisar('no encuentro la cabecera de esta página de tareas (¿ha cambiado Basecamp?).'); return; }
     montando = true;
     try {
       let grupos, vistaDoc;
       try {
         const cfg = await leerGrupos();
         grupos = cfg.grupos;
+        if (!cfg.vistas.length) { avisar('no encuentro ninguna línea «VISTA …» en el documento «Grupos de departamento».'); return; }
         vistaDoc = cfg.vistas.find(v => norm(v.proyecto) === norm(pag.proyecto));
-      } catch (e) { console.info('[AML Vista de equipo]', e.message); return; }
-      if (!vistaDoc) return;                                    // no es proyecto de departamento
+      } catch (e) { avisar('no puedo leer el documento «Grupos de departamento» (' + e.message + ').'); return; }
+      if (!vistaDoc) return;                                    // no es proyecto de departamento: sin aviso
 
       const r = await fetch(`${pag.cuenta}/tasks`, { headers: { Accept: 'text/html' }, credentials: 'same-origin' });
-      if (!r.ok) return;
+      if (!r.ok) { avisar('Basecamp no me deja cargar «All tasks» (HTTP ' + r.status + ').'); return; }
       const d = new DOMParser().parseFromString(await r.text(), 'text/html');
       const formOrig = d.querySelector('form[action$="/tasks/results"]');
       const frameOrig = d.querySelector('turbo-frame#all_assignments_results');
       // contenedor nativo: lleva los controladores de «Filter…» (quick-find) y de «Show subtasks» (toggle-class)
       const reportOrig = d.querySelector('div.report.all-tasks');
-      if (!formOrig || !frameOrig) { console.info('[AML Vista de equipo] Basecamp ha cambiado la vista All tasks'); return; }
+      if (!formOrig || !frameOrig) { avisar('Basecamp ha cambiado la página «All tasks» y no encuentro su filtro.'); return; }
       if (location.pathname !== pag.ruta || document.getElementById(ID)) return;   // se navegó mientras tanto
 
       // nombre -> id de persona, sacado del propio filtro nativo ("Me" = la persona actual)
@@ -210,6 +224,7 @@
       (primerGrupoBotones ? primerGrupoBotones.after(caja) : form.prepend(caja));
 
       cabecera.after(seccion);
+      document.getElementById(ID_AVISO)?.remove();
       const ocultables = [...cabecera.parentElement.children].filter(c => c !== cabecera && c !== seccion && !c.classList.contains('recordable__anchor'));
 
       // ---------- estado ----------
@@ -347,13 +362,14 @@
         form.requestSubmit(); ultimoRefresco = Date.now();
       }, 10 * 1000);
     } catch (e) {
-      console.warn('[AML Vista de equipo]', e);
+      avisar('error inesperado: ' + (e && e.message ? e.message : e) + '. Avisa a Manu con una captura.');
     } finally {
       montando = false;
     }
   }
 
   function desmontar() {
+    document.getElementById(ID_AVISO)?.remove();
     const s = document.getElementById(ID);
     if (!s) return;
     s.parentElement?.querySelectorAll('.aml-ve-oculto').forEach(c => c.classList.remove('aml-ve-oculto'));

@@ -8,6 +8,8 @@
 #aml-vista-equipo .aml-ve__grupos dialog[open] { display: flex; position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; margin: 0; }
 #aml-vista-equipo .aml-ve__grupos .popup__btn .icon--check { visibility: hidden; }
 #aml-vista-equipo .aml-ve__grupos .popup__btn input:checked ~ .icon--check { visibility: visible; }
+#aml-vista-equipo-aviso.aml-ve__fallo { margin: 8px 0 0; padding: 8px 12px; border-radius: 8px; font-size: 13px; text-align: center;
+  background: rgba(220, 120, 0, .12); color: inherit; border: 1px solid rgba(220, 120, 0, .35); }
 #aml-vista-equipo .aml-ve__grupos .aml-ve__completo { font-weight: 700; }
 #aml-vista-equipo .aml-ve__volver { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--color-border, rgba(128,128,128,.25)); }
 #aml-vista-equipo .aml-ve__volver .popup__btn { width: 100%; text-align: start; }

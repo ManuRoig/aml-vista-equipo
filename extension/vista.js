@@ -195,7 +195,7 @@
           <strong class="popup__title margin-bottom-4">Grupos…</strong>
           <ul class="popup__list margin-top-8" role="listbox" aria-multiselectable="true"></ul>
           <ul class="popup__list aml-ve__volver">
-            <li class="popup__item"><button type="button" class="popup__btn"><span class="truncate flex-1">Volver a la vista del departamento</span></button></li>
+            <li class="popup__item"><button type="button" class="popup__btn"><span class="truncate flex-1">Reiniciar filtro por defecto</span></button></li>
           </ul>
         </dialog>`;
       const lista = caja.querySelector('ul');
